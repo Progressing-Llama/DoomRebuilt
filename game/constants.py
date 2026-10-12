@@ -1,0 +1,2 @@
+TILE_SIZE = 50
+WALL_LEN = 100
