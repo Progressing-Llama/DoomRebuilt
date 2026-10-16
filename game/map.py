@@ -1,4 +1,6 @@
-from game.models import Line
+import numpy as np
+
+from game.models import Line, Rectangle
 
 MAP = """
 #########################
@@ -59,8 +61,8 @@ def find_tile_vertex_corners(grid_str: str, target: str = "*"):
 
     return corners
 
-def map_builder(map_str):
-    lines = []
+def map_builder(map_str, cam_pos, render_dist=300):
+    walls = []
 
     map_str = map_str.split("\n")
     map_str_ = []
@@ -70,21 +72,22 @@ def map_builder(map_str):
         map_str_.append(s)
 
     map_str = map_str_
-    print(map_str)
 
     for j, line in enumerate(map_str):
+        exit_break = False
         for i, char in enumerate(line):
             if char == "*":
                 for k in [0, 1]:
-                    lines.append(Line((i, j, k), (i + 1, j, k)))
-                    lines.append(Line((i, j, k), (i, j + 1, k)))
-                    lines.append(Line((i + 1, j, k), (i + 1, j + 1, k)))
-                    lines.append(Line((i, j + 1, k), (i + 1, j + 1, k)))
+                    if abs(np.linalg.norm([i, j, k]) - np.linalg.norm(cam_pos)) < render_dist:
+                        walls.append(Rectangle((i, j, k), (i + 1, j + 1, k)))
+                    else:
+                        exit_break = True
 
-                lines.append(Line((i, j, 0), (i, j, 1)))
-                lines.append(Line((i, j + 1, 0), (i, j + 1, 1)))
-                lines.append(Line((i + 1, j, 0), (i + 1, j, 1)))
-                lines.append(Line((i + 1, j + 1, 0), (i + 1, j + 1, 1)))
+                if exit_break:
+                    continue
 
-    return lines
+                walls.append(Rectangle((i, j, 0), (i + 1, j, 1)))
+                walls.append(Rectangle((i, j, 0), (i, j + 1, 1)))
+
+    return walls
 

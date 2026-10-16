@@ -66,6 +66,136 @@ class Line:
 
         self.start, self.end = rotated[0], rotated[1]
 
+class Rectangle:
+    def __init__(
+        self,
+        start=None,
+        end=None,
+        w=None,
+        h=None,
+        color=None,
+    ):
+        """
+        Defines a solid planar rectangle surface patch without line primitives.
+
+        Parameters:
+            start, end : np.ndarray | list
+                Opposite diagonal corners [x, y] or [x, y, z].
+            w, h : float
+                Width and height (used if 'end' is not provided).
+            color : any
+                Color or material property for the surface.
+        """
+        # Resolve 4 planar vertices (counter-clockwise: p0, p1, p2, p3)
+        if start is not None and end is not None:
+            p0 = np.asarray(start, dtype=float)
+            p2 = np.asarray(end, dtype=float)
+            z = p0[2] if len(p0) > 2 else 0.0
+            p1 = np.array([p2[0], p0[1], z])
+            p3 = np.array([p0[0], p2[1], z])
+            p0 = np.array([p0[0], p0[1], z])
+        elif start is not None and w is not None and h is not None:
+            p0 = np.asarray(start, dtype=float)
+            z = p0[2] if len(p0) > 2 else 0.0
+            p0 = np.array([p0[0], p0[1], z])
+            p1 = np.array([p0[0] + w, p0[1], z])
+            p2 = np.array([p0[0] + w, p0[1] + h, z])
+            p3 = np.array([p0[0], p0[1] + h, z])
+        else:
+            raise ValueError("Provide either (start, end) or (start, w, h).")
+
+        # [4, 3] array representing the 4 corners of the quad face
+        self.vertices = np.array([p0, p1, p2, p3], dtype=float)
+
+        if color is None:
+            color = (0, 0, 0)
+        self.color = color
+
+    # ---------------- Properties ---------------- #
+
+    @property
+    def center(self):
+        """Geometric centroid of the surface patch."""
+        return self.vertices.mean(axis=0)
+
+    @property
+    def normal(self):
+        """Surface normal vector (unit length)."""
+        v1 = self.vertices[1] - self.vertices[0]
+        v2 = self.vertices[3] - self.vertices[0]
+        cross = np.cross(v1, v2)
+        norm = np.linalg.norm(cross)
+        return cross / norm if norm > 0 else np.array([0.0, 0.0, 1.0])
+
+    @property
+    def area(self):
+        """Surface area calculated via cross product."""
+        v1 = self.vertices[1] - self.vertices[0]
+        v2 = self.vertices[3] - self.vertices[0]
+        return float(np.linalg.norm(np.cross(v1, v2)))
+
+    @property
+    def triangles(self):
+        """
+        Triangle index faces for graphics APIs (OpenGL, DirectX, Trimesh).
+        Returns two triangles: (p0, p1, p2) and (p0, p2, p3).
+        """
+        return np.array([[0, 1, 2], [0, 2, 3]], dtype=int)
+
+    @property
+    def triangle_vertices(self):
+        """Actual coordinates decomposed into 2 triangles: shape (2, 3, 3)."""
+        return self.vertices[self.triangles]
+
+    # ---------------- Transformations ---------------- #
+
+    def _rotate_points(self, points, angle_rad, axis, origin):
+        origin = np.asarray(origin, dtype=float)
+        shifted = points - origin
+
+        axis = np.asarray(axis, dtype=float)
+        axis = axis / np.linalg.norm(axis)
+        cos_a = np.cos(angle_rad)
+        sin_a = np.sin(angle_rad)
+
+        k_cross = np.cross(axis, shifted)
+        k_dot = np.dot(shifted, axis)[:, None]
+
+        rotated = shifted * cos_a + k_cross * sin_a + axis * k_dot * (1 - cos_a)
+        return rotated + origin
+
+    def rotate_x(self, angle, origin=None):
+        origin = self.center if origin is None else origin
+        self.vertices = self._rotate_points(self.vertices, angle, [1.0, 0.0, 0.0], origin)
+
+    def rotate_y(self, angle, origin=None):
+        origin = self.center if origin is None else origin
+        self.vertices = self._rotate_points(self.vertices, angle, [0.0, 1.0, 0.0], origin)
+
+    def rotate_z(self, angle, origin=None):
+        origin = self.center if origin is None else origin
+        self.vertices = self._rotate_points(self.vertices, angle, [0.0, 0.0, 1.0], origin)
+
+    def translate(self, offset):
+        """Translates the patch by [dx, dy, dz]."""
+        self.vertices += np.asarray(offset, dtype=float)
+
+    # ---------------- Style & Representation ---------------- #
+
+    def set_color(self, color):
+        self.color = color
+
+    def __iter__(self):
+        """Iterating over the rectangle yields its 4 corner vertices."""
+        return iter(self.vertices)
+
+    def __len__(self):
+        """Number of vertices forming the patch."""
+        return len(self.vertices)
+
+    def __repr__(self):
+        return f"Rectangle(patch_area={self.area:.2f}, center={self.center.tolist()}, color={self.color})"
+
 import numpy as np
 from collections import defaultdict
 

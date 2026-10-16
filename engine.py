@@ -6,15 +6,14 @@ import numpy as np
 import pygame
 
 from game.map import map_builder, MAP, find_tile_vertex_corners
-from game.models import Line, find_connected_shapes, find_closed_cycles, find_closed_cycles_as_lines
+from game.models import Line, find_connected_shapes, find_closed_cycles, find_closed_cycles_as_lines, Rectangle
 
 
 # engine.py
 
 class Engine:
     def __init__(self, screen, w):
-        self.map_lines = []
-        self.load_map(MAP)
+        self.map_objects = []
         self.screen = screen
 
         self.screen_width = screen.get_width()
@@ -33,8 +32,9 @@ class Engine:
         self.w = w
         # In engine.py __init__:
         self.w = w
-        for line in self.map_lines:
-            line.rotate_x(math.pi / 2, origin=[0, 0, 0])
+        self.load_map(MAP)
+        for obj in self.map_objects:
+            obj.rotate_x(math.pi / 2, origin=[0, 0, 0])
 
         self.jump_time = -1
         self.jump_duration = 0.5
@@ -78,45 +78,56 @@ class Engine:
     def run(self):
         w = self.w
 
-        for line in self.map_lines:
+        for obj in self.map_objects:
+            if isinstance(obj, Rectangle):
+                rect = obj
 
-            start = ((line.start - 0.5) * w).tolist()
-            end = ((line.end - 0.5) * w).tolist()
+                p1 = ((rect.vertices[0] - 0.5) * w).tolist()
+                p2 = ((rect.vertices[1] - 0.5) * w).tolist()
+                p3 = ((rect.vertices[2] - 0.5) * w).tolist()
+                p4 = ((rect.vertices[3] - 0.5) * w).tolist()
 
-            d = np.linalg.norm(np.array(start) - self.cam_pos)
+                d = np.linalg.norm(np.array(p1) - self.cam_pos)
 
-            if d > 1000:
-                continue
+                if d > 1000:
+                    continue
 
-            pt1 = self.project_3d_to_2d(start)
-            pt2 = self.project_3d_to_2d(end)
+                pt1 = self.project_3d_to_2d(p1)
+                pt2 = self.project_3d_to_2d(p2)
+                pt3 = self.project_3d_to_2d(p3)
+                pt4 = self.project_3d_to_2d(p4)
 
-            pygame.draw.line(self.screen, line.color, pt1, pt2, 1)
+                pygame.draw.polygon(self.screen, (255, 255, 255), [pt1, pt2, pt3, pt4], 0)
+                pygame.draw.polygon(self.screen, (0, 0, 0), [pt1, pt2, pt3, pt4], 1)
 
         self.jump_controller()
+        self.load_map(MAP)
+
+        for line in self.map_objects:
+            line.rotate_x(math.pi / 2, origin=[0, 0, 0])
 
     def rotate_camera(self, yaw_delta=0.0, pitch_delta=0.0):
         self.yaw += yaw_delta
         self.pitch += pitch_delta
 
     def load_map(self, map_str):
-        self.map_lines = map_builder(map_str)
+        self.map_objects = map_builder(map_str, self.cam_pos / self.w, 500 / self.w)
         new_lines = []
+        #
+        # for line in self.map_objects:
+        #     if not self.line_exists(line, True) or True:
+        #         new_lines.append(line)
+        #
+        # self.map_objects = new_lines
+        #
+        # self.map_corners = find_tile_vertex_corners(map_str)
+        # for corner in self.map_corners:
+        #     lower = [corner[0], corner[1], 0]
+        #     upper = [corner[0], corner[1], 1]
+        #
+        #     self.map_objects.append(Line(lower, upper))
 
-        for line in self.map_lines:
-            if not self.line_exists(line, True):
-                new_lines.append(line)
-
-        self.map_lines = new_lines
-
-        self.map_corners = find_tile_vertex_corners(map_str)
-        for corner in self.map_corners:
-            lower = [corner[0], corner[1], 0]
-            upper = [corner[0], corner[1], 1]
-
-            self.map_lines.append(Line(lower, upper))
-
-        self.polgons = find_closed_cycles_as_lines(self.map_lines)
+        #self.polgons = find_closed_cycles_as_lines(self.map_objects)
 
         #print(self.vertices_norm)
         #self.generate_lines()
@@ -153,7 +164,7 @@ class Engine:
     def line_exists(self, line, include_self=False):
         c = 0
 
-        for l in self.map_lines:
+        for l in self.map_objects:
             if l.is_duplicate(line):
                 c += 1
 
@@ -193,19 +204,19 @@ class Engine:
             for n in neighbors_close:
                 line = Line(v, n)
                 if not self.line_exists(line):
-                    self.map_lines.append(line)
+                    self.map_objects.append(line)
 
     def rotate_x(self, angle, origin=None):
 
-        for line in self.map_lines:
+        for line in self.map_objects:
             line.rotate_x(angle, origin)
 
     def rotate_y(self, angle, origin=None):
-        for line in self.map_lines:
+        for line in self.map_objects:
             line.rotate_y(angle, origin)
 
     def rotate_z(self, angle, origin=None):
-        for line in self.map_lines:
+        for line in self.map_objects:
             line.rotate_z(angle, origin)
 
     def jump_event(self):

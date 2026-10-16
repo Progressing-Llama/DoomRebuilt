@@ -66,8 +66,6 @@ while running:
     if down.is_pressed():
         engine.rotate_camera(pitch_delta=-rot_speed)
 
-
-
     # -------------------------------------------------------------
     # True camera direction vectors on the ground plane
     # -------------------------------------------------------------
@@ -83,6 +81,7 @@ while running:
     # Forward / Back
     if w.is_pressed():
         engine.cam_pos += forward * move_speed
+
     if s.is_pressed():
         engine.cam_pos -= forward * move_speed
 
